@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AIA — Designazioni Arbitrali</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --blu:#1a3a6b;--blu-med:#1e4d99;--blu-light:#2e6bc4;
+      --oro:#c8a84b;--oro-light:#e8c96a;
+      --grigio:#f0f3f8;--bianco:#fff;--testo:#1c1c2e;
+      --bordo:#d0d8e8;--success:#2e7d32;--warn:#e65100;--error:#c62828;
+      --radius:10px;--shadow:0 4px 18px rgba(26,58,107,.13);
+    }
+    body{font-family:'Segoe UI',Arial,sans-serif;background:var(--grigio);color:var(--testo);min-height:100vh}
+
+    /* HEADER */
+    header{
+      background:linear-gradient(135deg,var(--blu) 0%,var(--blu-med) 100%);
+      color:#fff;padding:0 32px;display:flex;align-items:center;
+      justify-content:space-between;height:68px;
+      box-shadow:0 3px 14px rgba(0,0,0,.25);position:sticky;top:0;z-index:100;
+    }
+    .header-left{display:flex;align-items:center;gap:14px}
+    .logo-circle{
+      width:42px;height:42px;border-radius:50%;background:var(--oro);
+      display:flex;align-items:center;justify-content:center;
+      font-size:19px;font-weight:900;color:var(--blu);flex-shrink:0
+    }
+    header h1{font-size:17px;font-weight:700;letter-spacing:.4px;line-height:1.2}
+    header h1 span{display:block;font-size:10px;font-weight:400;opacity:.7;letter-spacing:1px;text-transform:uppercase}
+    .copyright-badge{font-size:10px;opacity:.5;text-align:right;line-height:1.5}
+
+    /* TABS */
+    .tabs{display:flex;gap:0;border-bottom:2px solid var(--bordo);margin-bottom:0;background:var(--bianco);border-radius:var(--radius) var(--radius) 0 0;overflow:hidden}
+    .tab-btn{
+      flex:1;padding:12px 10px;border:none;background:transparent;
+      font-size:13px;font-weight:600;color:#666;cursor:pointer;
+      transition:all .2s;border-bottom:3px solid transparent;margin-bottom:-2px;
+    }
+    .tab-btn.active{color:var(--blu);border-bottom-color:var(--blu);background:#f5f8ff}
+    .tab-btn:hover:not(.active){background:#f9f9f9;color:var(--blu-med)}
+
+    /* LAYOUT */
+    .container{max-width:980px;margin:0 auto;padding:24px 18px 60px}
+    .card{background:var(--bianco);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px 26px;margin-bottom:20px}
+    .card-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--blu);border-bottom:2px solid var(--bordo);padding-bottom:9px;margin-bottom:16px}
+
+    /* BOTTONI RAPIDI */
+    .quick-btns{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+    .btn-quick{
+      flex:1;min-width:180px;padding:14px;
+      background:linear-gradient(135deg,var(--blu-med),var(--blu-light));
+      color:#fff;border:none;border-radius:var(--radius);
+      font-size:14px;font-weight:700;cursor:pointer;
+      transition:opacity .2s,transform .1s;
+      box-shadow:0 4px 14px rgba(30,77,153,.3);
+      display:flex;align-items:center;justify-content:center;gap:8px
+    }
+    .btn-quick:hover:not(:disabled){opacity:.9;transform:translateY(-1px)}
+    .btn-quick:disabled{background:#9ab0cc;cursor:not-allowed;transform:none;box-shadow:none}
+    .btn-quick.btn-oro{background:linear-gradient(135deg,var(--oro),var(--oro-light));color:var(--blu);box-shadow:0 4px 14px rgba(200,168,75,.35)}
+    .btn-quick.btn-verde{background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;box-shadow:0 4px 14px rgba(46,125,50,.35)}
+
+    /* FORM CONFIGURAZIONE */
+    .form-row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+    .form-group{display:flex;flex-direction:column;gap:5px;flex:1;min-width:160px}
+    .form-group label{font-size:11px;font-weight:700;color:var(--blu);text-transform:uppercase;letter-spacing:.6px}
+    .form-group select,.form-group input{
+      padding:9px 12px;border:1.5px solid var(--bordo);border-radius:7px;
+      font-size:13px;color:var(--testo);background:var(--grigio);
+      transition:border-color .2s;outline:none;
+    }
+    .form-group select:focus,.form-group input:focus{border-color:var(--blu-light);background:#fff}
+    .toggle-wrap{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--testo);cursor:pointer;padding:9px 0}
+    .toggle{width:40px;height:22px;background:#ccc;border-radius:11px;position:relative;transition:background .2s;flex-shrink:0}
+    .toggle.on{background:var(--blu-med)}
+    .toggle::after{content:'';position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+    .toggle.on::after{left:20px}
+
+    /* PROGRESS */
+    #progressArea{display:none;margin-top:16px}
+    .progress-bar-wrap{height:7px;background:var(--bordo);border-radius:4px;overflow:hidden;margin-bottom:10px}
+    .progress-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--blu-med),var(--oro));width:5%;transition:width .5s ease;animation:pulse-bar 2s infinite}
+    .progress-bar-fill.done{animation:none;background:var(--success);width:100%}
+    .progress-bar-fill.error{animation:none;background:var(--error)}
+    @keyframes pulse-bar{0%,100%{opacity:1}50%{opacity:.7}}
+    #progressLog{background:#0d1117;color:#58d68d;border-radius:6px;padding:10px 13px;font-family:'Courier New',monospace;font-size:11.5px;max-height:200px;overflow-y:auto;line-height:1.7}
+    .log-line{margin:0}
+    .log-line.section{color:#61afef;font-weight:bold;margin-top:4px}
+    .log-line.info{color:#98c379}
+    .log-line.campionato{color:#c678dd;font-weight:600}
+    .log-line.girone{color:#56b6c2}
+    .log-line.girone-ok{color:#98c379}
+    .log-line.girone-vuoto{color:#5c6370}
+    .log-line.girone-err{color:#e74c3c}
+    .log-line.warn{color:#f39c12}
+    .log-line.error{color:#e74c3c}
+    .log-line.done{color:#f0e68c;font-weight:bold}
+    .log-badge{background:#2ecc71;color:#0d1117;border-radius:3px;padding:0 4px;font-size:10px;font-weight:bold}
+
+    /* INFO BAR */
+    .info-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+    .info-pill{background:var(--grigio);border:1px solid var(--bordo);border-radius:20px;padding:5px 13px;font-size:12px;color:var(--blu);font-weight:600}
+    .export-btns{display:flex;gap:8px}
+    .btn-export{
+      display:flex;align-items:center;gap:6px;padding:9px 16px;
+      border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .2s
+    }
+    .btn-export.pdf{background:var(--oro);color:var(--blu);box-shadow:0 3px 10px rgba(200,168,75,.35)}
+    .btn-export.xlsx{background:#217346;color:#fff;box-shadow:0 3px 10px rgba(33,115,70,.3)}
+    .btn-export:hover{opacity:.88}
+
+    /* RISULTATI */
+    .cat-block{margin-bottom:24px}
+    .cat-header{
+      background:linear-gradient(90deg,var(--blu),var(--blu-med));color:#fff;
+      padding:9px 15px;border-radius:var(--radius) var(--radius) 0 0;
+      font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
+      display:flex;align-items:center;justify-content:space-between
+    }
+    .cat-count{background:var(--oro);color:var(--blu);border-radius:12px;padding:2px 10px;font-size:11px;font-weight:800}
+    table.des-table{width:100%;border-collapse:collapse;font-size:13px}
+    table.des-table th{background:#eef2f9;color:var(--blu);padding:8px 12px;text-align:left;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--bordo)}
+    table.des-table td{padding:8px 12px;border-bottom:1px solid var(--bordo);vertical-align:middle}
+    table.des-table tr:last-child td{border-bottom:none}
+    table.des-table tr:hover td{background:#f7f9fd}
+    .new-badge{background:#c8e6c9;color:#1b5e20;font-size:10px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:6px}
+    .removed-badge{background:#ffcdd2;color:#b71c1c;font-size:10px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:6px}
+    .ruolo-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+    .r-AE{background:#d4e6f1;color:#154360}.r-AA{background:#d5f5e3;color:#145a32}
+    .r-QU{background:#fdebd0;color:#784212}.r-4U{background:#e8daef;color:#4a235a}
+    .r-DEF{background:#eaecee;color:#4d5656}
+
+    /* STORICO */
+    .storico-empty{text-align:center;padding:32px;color:#999;font-size:13px}
+    table.storico-table{width:100%;border-collapse:collapse;font-size:13px}
+    table.storico-table th{background:#eef2f9;color:var(--blu);padding:8px 12px;text-align:left;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--bordo)}
+    table.storico-table td{padding:8px 12px;border-bottom:1px solid var(--bordo);vertical-align:middle}
+    table.storico-table tr:hover td{background:#f7f9fd}
+    .btn-storico-open{background:var(--blu-med);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer}
+    .btn-storico-open:hover{opacity:.85}
+
+    /* EMPTY STATE */
+    .empty-state{text-align:center;padding:44px 20px;color:#888}
+    .empty-state .icon{font-size:44px;margin-bottom:12px}
+
+    /* RIEPILOGO ARBITRI */
+    .riepilogo-grid{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+    .arbitro-chip{
+      background:var(--grigio);border:1.5px solid var(--bordo);border-radius:8px;
+      padding:8px 14px;font-size:12px;display:flex;align-items:center;gap:8px
+    }
+    .arbitro-chip strong{color:var(--blu)}
+    .chip-count{background:var(--blu);color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:800}
+
+    @media(max-width:600px){
+      header{padding:0 14px}.container{padding:14px 10px 50px}
+      .card{padding:16px 14px}.quick-btns{flex-direction:column}
+      .form-row{flex-direction:column}.export-btns{flex-wrap:wrap}
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo-circle">⚽</div>
+    <h1>AIA — Designazioni Arbitrali<span>Associazione Italiana Arbitri · Estrattore automatico</span></h1>
+  </div>
+  <div class="copyright-badge">© 2026 Nardoni Filippo<br>Uso riservato Sezione AIA di Gubbio</div>
+</header>
+
+<div class="container">
+
+  <!-- CARD CONTROLLI -->
+  <div class="card">
+    <div class="card-title">🔍 Ricerca Designazioni</div>
+
+    <!-- Bottoni rapidi -->
+    <div class="quick-btns">
+      <button class="btn-quick" onclick="avviaRapido()">
+        ⚡ Cerca Gubbio — Umbria + Nazionali
+      </button>
+      <button class="btn-quick btn-verde" onclick="avviaNazionaliRegione()">
+        🌍 Tutti gli arbitri Umbri nei Nazionali
+      </button>
+      <button class="btn-quick btn-oro" onclick="mostraConfigurazione()">
+        ⚙️ Altra Sezione / Regione
+      </button>
+    </div>
+
+    <!-- Configurazione avanzata (nascosta di default) -->
+    <div id="configPanel" style="display:none;border-top:1px solid var(--bordo);padding-top:16px;margin-top:4px">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Regione</label>
+          <select id="selRegione"></select>
+        </div>
+        <div class="form-group">
+          <label>Nome Sezione</label>
+          <input type="text" id="inputSezione" placeholder="es. Perugia, Terni, Foligno..."/>
+        </div>
+      </div>
+      <div class="form-row" style="align-items:center">
+        <label class="toggle-wrap" onclick="toggleNazionali()">
+          <div class="toggle on" id="toggleNaz"></div>
+          Cerca anche nei campionati nazionali (CAN D, Serie D, Calcio a 5...)
+        </label>
+      </div>
+      <button class="btn-quick" style="margin-top:8px" onclick="avviaCustom()">
+        🔎 Avvia Ricerca Personalizzata
+      </button>
+
+      <div style="border-top:1px dashed var(--bordo);margin-top:18px;padding-top:16px">
+        <p style="font-size:12px;color:#666;margin-bottom:12px">
+          <strong>Ricerca nazionali per regione</strong> — cerca tutti gli arbitri di una regione
+          (legge le sezioni dal sito in automatico) nei campionati nazionali.
+        </p>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Regione da cercare nei nazionali</label>
+            <select id="selRegioneNaz"></select>
+          </div>
+          <div style="display:flex;align-items:flex-end">
+            <button class="btn-quick btn-verde" style="min-width:auto;padding:10px 18px" onclick="avviaNazionaliRegioneCustom()">
+              🌍 Cerca nei Nazionali
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div id="progressArea">
+      <div class="progress-bar-wrap" style="margin-top:14px">
+        <div class="progress-bar-fill" id="progressFill"></div>
+      </div>
+      <div id="progressLog"></div>
+    </div>
+  </div>
+
+  <!-- TABS RISULTATI / STORICO / RIEPILOGO -->
+  <div id="pannelloRisultati" style="display:none">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="tabs">
+        <button class="tab-btn active" onclick="mostraTab('risultati',this)">📋 Risultati</button>
+        <button class="tab-btn" onclick="mostraTab('riepilogo',this)">👤 Riepilogo arbitri</button>
+        <button class="tab-btn" onclick="mostraTab('storico',this);caricaStorico()">🗂️ Storico</button>
+      </div>
+
+      <!-- TAB RISULTATI -->
+      <div id="tab-risultati" style="padding:22px 26px">
+        <div class="info-bar">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <span class="info-pill" id="pillData">—</span>
+            <span class="info-pill" id="pillConfig">—</span>
+            <span class="info-pill" id="pillTotale">—</span>
+          </div>
+          <div class="export-btns">
+            <button class="btn-export pdf" onclick="esportaPDF()">📄 PDF</button>
+            <button class="btn-export xlsx" onclick="esportaExcel()">📊 Excel</button>
+          </div>
+        </div>
+        <div id="risultatiBody"></div>
+      </div>
+
+      <!-- TAB RIEPILOGO -->
+      <div id="tab-riepilogo" style="display:none;padding:22px 26px">
+        <p style="font-size:12px;color:#888;margin-bottom:14px">Designazioni totali per arbitro in questa estrazione.</p>
+        <div id="riepilogoBody"></div>
+      </div>
+
+      <!-- TAB STORICO -->
+      <div id="tab-storico" style="display:none;padding:22px 26px">
+        <p style="font-size:12px;color:#888;margin-bottom:14px">Tutte le estrazioni salvate automaticamente nella cartella <code>storico/</code>.</p>
+        <div id="storicoBody"><div class="storico-empty">Caricamento...</div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Stato globale ─────────────────────────────────────────────
+let datiCorrente  = [];
+let configCorrente = { regione: 'umbria', sezione: 'Gubbio', nazionali: false };
+let nazionaliOn   = true; // attivo di default
+let prevData      = null; // dati precedenti per confronto
+
+// ── Init ──────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  await caricaRegioni();
+  ripristinaPref();
+});
+
+async function caricaRegioni() {
+  try {
+    const r = await fetch('http://localhost:3456/regioni');
+    const regioni = await r.json();
+    const sel = document.getElementById('selRegione');
+    const selNaz = document.getElementById('selRegioneNaz');
+    regioni.forEach(reg => {
+      const opt = document.createElement('option');
+      opt.value = reg.slug;
+      opt.textContent = reg.nome;
+      if (reg.slug === 'umbria') opt.selected = true;
+      sel.appendChild(opt);
+      const opt2 = opt.cloneNode(true);
+      selNaz.appendChild(opt2);
+    });
+  } catch(e) {
+    console.warn('Server non raggiungibile per la lista regioni');
+  }
+}
+
+function ripristinaPref() {
+  const saved = localStorage.getItem('aia_config');
+  if (saved) {
+    try {
+      const c = JSON.parse(saved);
+      if (c.regione) document.getElementById('selRegione').value = c.regione;
+      if (c.sezione) document.getElementById('inputSezione').value = c.sezione;
+      if (c.nazionali) { nazionaliOn = true; document.getElementById('toggleNaz').classList.add('on'); }
+    } catch(e) {}
+  }
+}
+
+function salvaPref(reg, sez, naz) {
+  localStorage.setItem('aia_config', JSON.stringify({ regione: reg, sezione: sez, nazionali: naz }));
+}
+
+// ── UI helpers ────────────────────────────────────────────────
+function mostraConfigurazione() {
+  const p = document.getElementById('configPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleNazionali() {
+  nazionaliOn = !nazionaliOn;
+  document.getElementById('toggleNaz').classList.toggle('on', nazionaliOn);
+}
+
+function mostraTab(nome, btn) {
+  ['risultati','riepilogo','storico'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === nome ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ── Avvio ricerca ─────────────────────────────────────────────
+function avviaRapido() { // nazionali sempre inclusi
+  avvia("umbria", "Gubbio", true);
+}
+
+function avviaCustom() {
+  const reg = document.getElementById('selRegione').value;
+  const sez = document.getElementById('inputSezione').value.trim();
+  if (!sez) { alert('Inserisci il nome della sezione!'); return; }
+  avvia(reg, sez, nazionaliOn);
+}
+
+function avvia(regione, sezione, nazionali) {
+  configCorrente = { regione, sezione, nazionali };
+  salvaPref(regione, sezione, nazionali);
+
+  const fill = document.getElementById('progressFill');
+  const log  = document.getElementById('progressLog');
+  document.getElementById('progressArea').style.display = 'block';
+  document.querySelectorAll('.btn-quick').forEach(b => b.disabled = true);
+  log.innerHTML = '';
+  fill.className = 'progress-bar-fill';
+  fill.style.width = '5%';
+  datiCorrente = [];
+
+  const addLog = (msg, cls = '') => {
+    const p = document.createElement('p');
+    p.className = 'log-line' + (cls ? ' ' + cls : '');
+    p.textContent = '› ' + msg;
+    log.appendChild(p);
+    log.scrollTop = log.scrollHeight;
+  };
+  const addLogHTML = (msg, cls = '') => {
+    const p = document.createElement('p');
+    p.className = 'log-line' + (cls ? ' ' + cls : '');
+    p.innerHTML = '› ' + msg;
+    log.appendChild(p);
+    log.scrollTop = log.scrollHeight;
+  };
+
+  const url = `http://localhost:3456/scrape?regione=${encodeURIComponent(regione)}&sezione=${encodeURIComponent(sezione)}&nazionali=${nazionali}`;
+  const es  = new EventSource(url);
+
+  // Contatori per la barra di avanzamento dinamica
+  let totCampionati = 0, doneCampionati = 0;
+
+  es.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+
+    if (data.step === 'start') {
+      fill.style.width = '5%';
+      addLog(data.msg, 'section');
+
+    } else if (data.step === 'section') {
+      // Titoli di sezione (regionali / sezione / nazionali)
+      addLog(data.msg, 'section');
+      if (data.msg.includes('NAZIONALI')) fill.style.width = '55%';
+      else if (data.msg.includes('REGIONALI')) fill.style.width = '8%';
+      else if (data.msg.includes('SEZIONE') || data.msg.startsWith('▶')) fill.style.width = '45%';
+
+    } else if (data.step === 'info') {
+      addLog(data.msg, 'info');
+
+    } else if (data.step === 'warn') {
+      addLog('⚠️ ' + data.msg, 'warn');
+
+    } else if (data.step === 'progress') {
+      // Log dettagliato campionato/girone con stato
+      if (data.tipo === 'campionato') {
+        if (data.stato === 'inizio') {
+          totCampionati++;
+          addLog(data.msg, 'campionato');
+        } else if (data.stato === 'completato') {
+          doneCampionati++;
+          // Aggiorna barra proporzionalmente ai campionati completati
+          const pct = Math.min(5 + doneCampionati * 2, 95);
+          fill.style.width = pct + '%';
+        }
+      } else if (data.tipo === 'girone') {
+        let cls = 'girone';
+        if (data.stato === 'ok')     cls = data.trovati > 0 ? 'girone-ok' : 'girone-vuoto';
+        if (data.stato === 'errore') cls = 'girone-err';
+        if (data.stato === 'vuoto')  cls = 'girone-vuoto';
+        const suffix = data.stato === 'ok' && data.trovati > 0
+          ? ` <span class="log-badge">${data.trovati}</span>`
+          : '';
+        addLogHTML(data.msg + suffix, cls);
+      }
+
+    } else if (data.step === 'done') {
+      fill.style.width = '100%';
+      fill.classList.add('done');
+      addLog('✅ ' + data.msg, 'done');
+      if (data.csvNome) addLog('💾 Salvato: ' + data.csvNome, 'info');
+      es.close();
+      datiCorrente = data.data || [];
+      renderRisultati();
+      renderRiepilogo();
+      document.querySelectorAll('.btn-quick').forEach(b => b.disabled = false);
+
+    } else if (data.step === 'error') {
+      fill.classList.add('error');
+      addLog('❌ ' + data.msg, 'error');
+      es.close();
+      document.querySelectorAll('.btn-quick').forEach(b => b.disabled = false);
+    }
+  };
+
+  es.onerror = () => {
+    addLog('❌ Impossibile connettersi al server (porta 3456). Avvia node server.js', 'error');
+    fill.classList.add('error');
+    es.close();
+    document.querySelectorAll('.btn-quick').forEach(b => b.disabled = false);
+  };
+}
+
+// ── Render risultati ──────────────────────────────────────────
+function renderRisultati(data) {
+  data = data || datiCorrente;
+  const body  = document.getElementById('risultatiBody');
+  const pannello = document.getElementById('pannelloRisultati');
+  pannello.style.display = 'block';
+
+  document.getElementById('pillData').textContent =
+    '📅 ' + new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('pillConfig').textContent =
+    `📍 ${configCorrente.sezione} — ${configCorrente.regione}`;
+  const tot = data.reduce((s,p) => s + p.arbitri.length, 0);
+  document.getElementById('pillTotale').textContent = `👤 ${tot} designazioni`;
+
+  if (data.length === 0) {
+    body.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>Nessuna designazione trovata per questa sezione.</p></div>';
+    return;
+  }
+
+  const byCat = {};
+  data.forEach(p => { if (!byCat[p.categoria]) byCat[p.categoria] = []; byCat[p.categoria].push(p); });
+
+  let html = '';
+  for (const [cat, partite] of Object.entries(byCat)) {
+    const n = partite.reduce((s,p) => s + p.arbitri.length, 0);
+    html += `<div class="cat-block">
+      <div class="cat-header"><span>${cat}</span><span class="cat-count">${n} arbitr${n===1?'o':'i'}</span></div>
+      <table class="des-table"><thead><tr><th>Arbitro</th><th>Ruolo</th><th>Partita</th></tr></thead><tbody>`;
+    partite.forEach(p => {
+      p.arbitri.forEach(a => {
+        html += `<tr>
+          <td><strong>${a.nome}</strong>${a._new?'<span class="new-badge">NUOVA</span>':''}${a._removed?'<span class="removed-badge">RIMOSSA</span>':''}</td>
+          <td><span class="ruolo-badge ${getRuoloCss(a.ruolo)}">${a.ruolo}</span></td>
+          <td>${p.partita}</td></tr>`;
+      });
+    });
+    html += '</tbody></table></div>';
+  }
+  body.innerHTML = html;
+}
+
+function getRuoloCss(r) {
+  r = (r||'').toUpperCase();
+  if (r.includes('AE')||r==='ARBITRO') return 'r-AE';
+  if (r.includes('AA')||r.includes('ARBIT')) return 'r-AA';
+  if (r.includes('QU')) return 'r-QU';
+  if (r.includes('4U')||r.includes('QUART')) return 'r-4U';
+  return 'r-DEF';
+}
+
+// ── Riepilogo per arbitro ─────────────────────────────────────
+function renderRiepilogo(data) {
+  data = data || datiCorrente;
+  const body = document.getElementById('riepilogoBody');
+  const conteggio = {};
+  data.forEach(p => p.arbitri.forEach(a => {
+    conteggio[a.nome] = (conteggio[a.nome] || 0) + 1;
+  }));
+  const sorted = Object.entries(conteggio).sort((a,b) => b[1]-a[1]);
+  if (sorted.length === 0) { body.innerHTML = '<div class="storico-empty">Nessun dato.</div>'; return; }
+  let html = '<div class="riepilogo-grid">';
+  sorted.forEach(([nome, n]) => {
+    html += `<div class="arbitro-chip"><strong>${nome}</strong><span class="chip-count">${n} gara${n>1?'e':''}</span></div>`;
+  });
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+// ── Storico ───────────────────────────────────────────────────
+// ── Nazionali per regione (bottone rapido Umbria) ────────────
+function avviaNazionaliRegione() {
+  avviaNazRegione('umbria');
+}
+
+function avviaNazionaliRegioneCustom() {
+  const reg = document.getElementById('selRegioneNaz').value;
+  avviaNazRegione(reg);
+}
+
+function avviaNazRegione(regione) {
+  const fill = document.getElementById('progressFill');
+  const log  = document.getElementById('progressLog');
+  document.getElementById('progressArea').style.display = 'block';
+  document.querySelectorAll('.btn-quick').forEach(b => b.disabled = true);
+  log.innerHTML = '';
+  fill.className = 'progress-bar-fill';
+  fill.style.width = '5%';
+  datiCorrente = [];
+  configCorrente = { regione, sezione: 'TUTTI', nazionali: true };
+
+  const addLog = (msg, cls='') => {
+    const p = document.createElement('p');
+    p.className = 'log-line' + (cls ? ' '+cls : '');
+    p.textContent = '› ' + msg;
+    log.appendChild(p); log.scrollTop = log.scrollHeight;
+  };
+  const addLogHTML = (msg, cls='') => {
+    const p = document.createElement('p');
+    p.className = 'log-line' + (cls ? ' '+cls : '');
+    p.innerHTML = '› ' + msg;
+    log.appendChild(p); log.scrollTop = log.scrollHeight;
+  };
+
+  addLog(`Avvio ricerca tutti gli arbitri di ${regione.toUpperCase()} nei campionati nazionali...`, 'section');
+
+  const es = new EventSource(`http://localhost:3456/scrape-nazionali-regione?regione=${encodeURIComponent(regione)}`);
+  let totCampionati = 0, doneCampionati = 0;
+
+  es.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.step === 'start' || data.step === 'info') { addLog(data.msg, 'info'); }
+    else if (data.step === 'section') { addLog(data.msg, 'section'); }
+    else if (data.step === 'warn')    { addLog('⚠️ ' + data.msg, 'warn'); }
+    else if (data.step === 'progress') {
+      if (data.tipo === 'campionato') {
+        if (data.stato === 'inizio') { totCampionati++; addLog(data.msg, 'campionato'); }
+        else if (data.stato === 'completato') { doneCampionati++; fill.style.width = Math.min(5 + doneCampionati*2, 95) + '%'; }
+      } else if (data.tipo === 'girone') {
+        let cls = data.stato === 'ok' && data.trovati > 0 ? 'girone-ok' : data.stato === 'errore' ? 'girone-err' : 'girone-vuoto';
+        const suffix = data.stato === 'ok' && data.trovati > 0 ? ` <span class="log-badge">${data.trovati}</span>` : '';
+        addLogHTML(data.msg + suffix, cls);
+      }
+    }
+    else if (data.step === 'done') {
+      fill.style.width = '100%'; fill.classList.add('done');
+      addLog('✅ ' + data.msg, 'done');
+      if (data.csvNome) addLog('💾 Salvato: ' + data.csvNome, 'info');
+      es.close();
+      datiCorrente = data.data || [];
+      renderRisultati(); renderRiepilogo();
+      document.querySelectorAll('.btn-quick').forEach(b => b.disabled = false);
+    } else if (data.step === 'error') {
+      fill.classList.add('error');
+      addLog('❌ ' + data.msg, 'error');
+      es.close();
+      document.querySelectorAll('.btn-quick').forEach(b => b.disabled = false);
+    }
+  };
+  es.onerror = () => {
+    addLog('❌ Server non raggiungibile (porta 3456).', 'error');
+    fill.classList.add('error'); es.close();
+    document.querySelectorAll('.btn-quick').forEach(b => b.disabled = false);
+  };
+}
+
+// ── Elimina file storico ──────────────────────────────────────
+async function eliminaStorico(nome, btn) {
+  if (!confirm(`Eliminare il file "${nome}"?`)) return;
+  try {
+    const r = await fetch(`http://localhost:3456/storico/${encodeURIComponent(nome)}`, { method: 'DELETE' });
+    if (r.ok) {
+      // Rimuovi la riga dalla tabella
+      btn.closest('tr').remove();
+    } else {
+      alert('Errore durante l\'eliminazione.');
+    }
+  } catch(e) {
+    alert('Impossibile contattare il server.');
+  }
+}
+
+async function caricaStorico() {
+  const body = document.getElementById('storicoBody');
+  try {
+    const r = await fetch('http://localhost:3456/storico');
+    const files = await r.json();
+    if (files.length === 0) {
+      body.innerHTML = '<div class="storico-empty">Nessuna estrazione salvata ancora.</div>';
+      return;
+    }
+    let html = '<table class="storico-table"><thead><tr><th>Data / Ora</th><th>Regione · Sezione</th><th>Designazioni</th><th></th></tr></thead><tbody>';
+    files.forEach(f => {
+      const d = new Date(f.data).toLocaleString('it-IT');
+      const parts = f.nome.replace('.csv','').split('_');
+      const info = parts.slice(2).join(' ').replace(/_/g,' ');
+      html += `<tr>
+        <td>${d}</td>
+        <td>${info}</td>
+        <td><span class="chip-count" style="background:var(--blu-med)">${f.designazioni}</span></td>
+        <td style="display:flex;gap:6px">
+          <button class="btn-storico-open" onclick="apriStorico('${f.nome}')">📂 Apri</button>
+          <button class="btn-storico-open" style="background:#c62828" onclick="eliminaStorico('${f.nome}', this)">🗑️</button>
+        </td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    body.innerHTML = html;
+  } catch(e) {
+    body.innerHTML = '<div class="storico-empty">Impossibile caricare lo storico (server non attivo?).</div>';
+  }
+}
+
+async function apriStorico(nome) {
+  try {
+    const r = await fetch(`http://localhost:3456/storico/${encodeURIComponent(nome)}`);
+    const data = await r.json();
+    // Imposta come dati correnti e mostra nella tab risultati
+    const parts = nome.replace('.csv','').split('_');
+    const reg = parts[2] || '';
+    const sez = parts[3] || '';
+    configCorrente = { regione: reg, sezione: sez, nazionali: false };
+    document.getElementById('pillConfig').textContent = `📁 ${nome}`;
+    datiCorrente = data;
+    renderRisultati(data);
+    renderRiepilogo(data);
+    // Passa alla tab risultati
+    document.querySelectorAll('.tab-btn')[0].click();
+  } catch(e) {
+    alert('Impossibile aprire il file: ' + e.message);
+  }
+}
+
+// ── Export PDF ────────────────────────────────────────────────
+function esportaPDF() {
+  if (!datiCorrente.length) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const BLU = [26,58,107], ORO = [200,168,75];
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  let y = 0;
+
+  doc.setFillColor(...BLU); doc.rect(0,0,W,22,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(12); doc.setFont('helvetica','bold');
+  doc.text('AIA — DESIGNAZIONI ARBITRALI', W/2, 9, {align:'center'});
+  doc.setFontSize(8); doc.setFont('helvetica','normal');
+  const info = `${configCorrente.sezione.toUpperCase()} · ${configCorrente.regione.toUpperCase()} · ${new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).toUpperCase()}`;
+  doc.text(info, W/2, 16, {align:'center'});
+  y = 27;
+
+  const byCat = {};
+  datiCorrente.forEach(p => { if(!byCat[p.categoria]) byCat[p.categoria]=[]; byCat[p.categoria].push(p); });
+
+  for (const [cat, partite] of Object.entries(byCat)) {
+    if (y > H-30) { doc.addPage(); y = 15; }
+    doc.setFillColor(...BLU); doc.roundedRect(10,y,W-20,8,1.5,1.5,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(8.5); doc.setFont('helvetica','bold');
+    doc.text(cat.toUpperCase(), 14, y+5.2);
+    y += 11;
+
+    const rows = [];
+    partite.forEach(p => p.arbitri.forEach(a => rows.push([a.nome, a.ruolo, p.partita])));
+    doc.autoTable({
+      startY: y, head:[['Arbitro','Ruolo','Partita']], body: rows,
+      margin:{left:10,right:10},
+      styles:{fontSize:9,cellPadding:3,textColor:[28,28,46],lineColor:[208,216,232],lineWidth:.2},
+      headStyles:{fillColor:[238,242,249],textColor:BLU,fontStyle:'bold',fontSize:8},
+      alternateRowStyles:{fillColor:[250,252,255]},
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  }
+
+  const nPag = doc.internal.getNumberOfPages();
+  for (let i=1;i<=nPag;i++) {
+    doc.setPage(i);
+    doc.setFillColor(...ORO); doc.rect(0,H-9,W,9,'F');
+    doc.setTextColor(...BLU); doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text('© 2026 Nardoni Filippo — Uso riservato Sezione AIA di Gubbio', W/2, H-3, {align:'center'});
+    doc.text(`${i}/${nPag}`, W-12, H-3, {align:'right'});
+  }
+  doc.save(`AIA_${configCorrente.sezione}_${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
+// ── Export Excel ──────────────────────────────────────────────
+function esportaExcel() {
+  if (!datiCorrente.length) return;
+  const wb = XLSX.utils.book_new();
+
+  // Foglio designazioni
+  const righe = [['Categoria','Partita','Arbitro','Ruolo','Sezione']];
+  datiCorrente.forEach(p => p.arbitri.forEach(a =>
+    righe.push([p.categoria, p.partita, a.nome, a.ruolo, a.sezione])
+  ));
+  const ws = XLSX.utils.aoa_to_sheet(righe);
+  ws['!cols'] = [{wch:28},{wch:35},{wch:22},{wch:12},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Designazioni');
+
+  // Foglio riepilogo
+  const conteggio = {};
+  datiCorrente.forEach(p => p.arbitri.forEach(a => { conteggio[a.nome]=(conteggio[a.nome]||0)+1; }));
+  const riepilogo = [['Arbitro','Designazioni'], ...Object.entries(conteggio).sort((a,b)=>b[1]-a[1])];
+  const ws2 = XLSX.utils.aoa_to_sheet(riepilogo);
+  ws2['!cols'] = [{wch:25},{wch:15}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Riepilogo');
+
+  XLSX.writeFile(wb, `AIA_${configCorrente.sezione}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+</script>
+</body>
+</html>

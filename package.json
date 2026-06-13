@@ -1,0 +1,18 @@
+{
+  "name": "aia-gubbio-designazioni",
+  "version": "1.0.0",
+  "description": "Estrattore designazioni AIA Umbria — Sezione di Gubbio",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "install-browsers": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "playwright": "^1.44.0"
+  },
+  "author": "Nardoni Filippo",
+  "license": "UNLICENSED",
+  "private": true
+}
