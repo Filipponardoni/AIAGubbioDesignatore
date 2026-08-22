@@ -624,6 +624,31 @@ app.get('/storico/:nome', (req, res) => {
   res.json(risultati);
 });
 
+// ─── Endpoint: cerca un arbitro in tutto lo storico ────────────
+app.get('/storico/cerca/:nome', (req, res) => {
+  const query = (req.params.nome || '').trim().toLowerCase();
+  if (!query) return res.json([]);
+  try {
+    const files = fs.readdirSync(STORICO_DIR).filter(f => f.endsWith('.csv'));
+    const risultati = [];
+    files.forEach(f => {
+      const fpath = path.join(STORICO_DIR, f);
+      const stat  = fs.statSync(fpath);
+      const lines = fs.readFileSync(fpath, 'utf8').split('\n').filter(r => r.trim());
+      for (let i = 1; i < lines.length; i++) {
+        const cols  = lines[i].match(/("(?:[^"]|"")*"|[^,]+)/g) || [];
+        const clean = cols.map(c => c.replace(/^"|"$/g,'').replace(/""/g,'"'));
+        const [categoria, partita, nome, ruolo, sezione] = clean;
+        if (nome && nome.toLowerCase().includes(query)) {
+          risultati.push({ file: f, data: stat.mtime, categoria, partita, nome, ruolo, sezione });
+        }
+      }
+    });
+    risultati.sort((a, b) => new Date(b.data) - new Date(a.data));
+    res.json(risultati);
+  } catch(e) { res.json([]); }
+});
+
 // ─── Endpoint: scraping SSE ───────────────────────────────────
 app.get('/scrape', async (req, res) => {
   res.setHeader('Content-Type',  'text/event-stream');

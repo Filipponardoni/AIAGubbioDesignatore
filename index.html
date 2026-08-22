@@ -249,7 +249,16 @@
   <!-- STORICO — sempre visibile e consultabile -->
   <div class="card">
     <div class="card-title">🗂️ Storico Estrazioni</div>
-    <p style="font-size:12px;color:#888;margin-bottom:14px">Tutte le estrazioni salvate automaticamente nella cartella <code>storico/</code>.</p>
+
+    <div class="form-row" style="margin-bottom:4px">
+      <div class="form-group" style="max-width:320px">
+        <label>Cerca arbitro nello storico</label>
+        <input type="text" id="cercaStoricoNome" placeholder="Nome arbitro..." oninput="cercaNelloStorico()"/>
+      </div>
+    </div>
+    <div id="storicoCercaBody"></div>
+
+    <p style="font-size:12px;color:#888;margin:14px 0">Tutte le estrazioni salvate automaticamente nella cartella <code>storico/</code>.</p>
     <div id="storicoBody"><div class="storico-empty">Caricamento...</div></div>
   </div>
 
@@ -272,6 +281,12 @@
           <div class="export-btns">
             <button class="btn-export pdf" onclick="esportaPDF()">📄 PDF</button>
             <button class="btn-export xlsx" onclick="esportaExcel()">📊 Excel</button>
+          </div>
+        </div>
+        <div class="form-row" style="margin-bottom:16px">
+          <div class="form-group" style="max-width:280px">
+            <label>Cerca arbitro in questi risultati</label>
+            <input type="text" id="filtroNome" placeholder="Nome arbitro..." oninput="filtraRisultati()"/>
           </div>
         </div>
         <div id="risultatiBody"></div>
@@ -504,7 +519,7 @@ function renderRisultati(data) {
     partite.forEach(p => {
       p.arbitri.forEach(a => {
         const m = mappaRuolo(cat, a.ruolo);
-        html += `<tr>
+        html += `<tr data-nome="${(a.nome||'').toLowerCase()}">
           <td><strong>${a.nome}</strong>${a._new?'<span class="new-badge">NUOVA</span>':''}${a._removed?'<span class="removed-badge">RIMOSSA</span>':''}</td>
           <td><span class="ruolo-badge ${m.css}">${m.label}</span></td>
           <td>${p.partita}</td></tr>`;
@@ -513,6 +528,56 @@ function renderRisultati(data) {
     html += '</tbody></table></div>';
   }
   body.innerHTML = html;
+  const filtro = document.getElementById('filtroNome');
+  if (filtro) filtro.value = '';
+}
+
+// ── Filtro rapido sui risultati correnti ────────────────────────
+function filtraRisultati() {
+  const q = document.getElementById('filtroNome').value.trim().toLowerCase();
+  document.querySelectorAll('#risultatiBody table.des-table tbody tr').forEach(tr => {
+    const nome = tr.dataset.nome || '';
+    tr.style.display = !q || nome.includes(q) ? '' : 'none';
+  });
+  document.querySelectorAll('#risultatiBody .cat-block').forEach(block => {
+    const anyVisible = Array.from(block.querySelectorAll('tbody tr')).some(tr => tr.style.display !== 'none');
+    block.style.display = anyVisible ? '' : 'none';
+  });
+}
+
+// ── Ricerca di un arbitro in tutto lo storico ───────────────────
+let cercaStoricoTimeout = null;
+function cercaNelloStorico() {
+  clearTimeout(cercaStoricoTimeout);
+  const q = document.getElementById('cercaStoricoNome').value.trim();
+  const body = document.getElementById('storicoCercaBody');
+  if (!q) { body.innerHTML = ''; return; }
+  body.innerHTML = '<div class="storico-empty">Ricerca in corso...</div>';
+  cercaStoricoTimeout = setTimeout(async () => {
+    try {
+      const r = await fetch(`http://localhost:3456/storico/cerca/${encodeURIComponent(q)}`);
+      const risultati = await r.json();
+      if (!risultati.length) {
+        body.innerHTML = `<div class="storico-empty">Nessuna designazione trovata per "${q}".</div>`;
+        return;
+      }
+      let html = `<table class="storico-table"><thead><tr>
+        <th>File</th><th>Categoria</th><th>Partita</th><th>Ruolo</th></tr></thead><tbody>`;
+      risultati.forEach(r2 => {
+        const m = mappaRuolo(r2.categoria, r2.ruolo);
+        html += `<tr>
+          <td>${r2.file}</td>
+          <td>${r2.categoria || ''}</td>
+          <td>${r2.partita || ''}</td>
+          <td><span class="ruolo-badge ${m.css}">${m.label}</span></td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      body.innerHTML = html;
+    } catch(e) {
+      body.innerHTML = '<div class="storico-empty">Impossibile cercare (server non attivo?).</div>';
+    }
+  }, 300);
 }
 
 // ── Mappatura ruoli per categoria ──────────────────────────────
