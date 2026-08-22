@@ -248,6 +248,45 @@
 
   <!-- STORICO — sempre visibile e consultabile -->
   <div class="card">
+    <div class="card-title">🕵️ Ricerca per Nome Arbitro (sul sito AIA)</div>
+    <p style="font-size:12px;color:#666;margin-bottom:12px">
+      Cerca un arbitro specifico direttamente sul sito, senza dover scaricare tutta la sezione.
+    </p>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Nome Arbitro</label>
+        <input type="text" id="inputNomeCerca" placeholder="es. Filippo Nardoni"/>
+      </div>
+      <div class="form-group">
+        <label>CRA (Regione)</label>
+        <select id="selRegioneNome"></select>
+      </div>
+    </div>
+    <div class="form-row" style="align-items:center">
+      <label class="toggle-wrap" onclick="toggleNazionaliNome()">
+        <div class="toggle" id="toggleNazNome"></div>
+        Cerca anche nei campionati nazionali (oltre al CRA)
+      </label>
+    </div>
+    <div class="quick-btns" style="margin-top:8px">
+      <button class="btn-quick" id="btnAvviaRicercaNome" onclick="avviaRicercaNome()">
+        🔎 Avvia Ricerca per Nome
+      </button>
+      <button class="btn-quick" id="btnFermaRicercaNome" style="background:linear-gradient(135deg,#c62828,#e53935)" disabled onclick="fermaRicercaNome()">
+        ⏹ Ferma e Salva Trovati Finora
+      </button>
+    </div>
+
+    <div id="progressAreaNome" style="display:none;margin-top:16px">
+      <div class="progress-bar-wrap" style="margin-top:14px">
+        <div class="progress-bar-fill" id="progressFillNome"></div>
+      </div>
+      <div id="progressLogNome"></div>
+    </div>
+  </div>
+
+  <!-- STORICO — sempre visibile e consultabile -->
+  <div class="card">
     <div class="card-title">🗂️ Storico Estrazioni</div>
 
     <div class="form-row" style="margin-bottom:4px">
@@ -323,14 +362,15 @@ async function caricaRegioni() {
     const regioni = await r.json();
     const sel = document.getElementById('selRegione');
     const selNaz = document.getElementById('selRegioneNaz');
+    const selNome = document.getElementById('selRegioneNome');
     regioni.forEach(reg => {
       const opt = document.createElement('option');
       opt.value = reg.slug;
       opt.textContent = reg.nome;
       if (reg.slug === 'umbria') opt.selected = true;
       sel.appendChild(opt);
-      const opt2 = opt.cloneNode(true);
-      selNaz.appendChild(opt2);
+      selNaz.appendChild(opt.cloneNode(true));
+      selNome.appendChild(opt.cloneNode(true));
     });
   } catch(e) {
     console.warn('Server non raggiungibile per la lista regioni');
@@ -374,6 +414,129 @@ function avviaRapido() { // nazionali sempre inclusi
 
 function avviaRapidoSoloRegionali() { // solo regionali, niente nazionali
   avvia("umbria", "Gubbio", false);
+}
+
+// ── Ricerca per nome arbitro (con stop manuale) ─────────────────
+let nazionaliNomeOn   = false;
+let jobIdNomeCorrente = null;
+
+function toggleNazionaliNome() {
+  nazionaliNomeOn = !nazionaliNomeOn;
+  document.getElementById('toggleNazNome').classList.toggle('on', nazionaliNomeOn);
+}
+
+function avviaRicercaNome() {
+  const nome = document.getElementById('inputNomeCerca').value.trim();
+  if (!nome) { alert('Inserisci il nome dell\'arbitro da cercare!'); return; }
+  const regione = document.getElementById('selRegioneNome').value;
+  const naz = nazionaliNomeOn;
+
+  configCorrente = { regione, sezione: `Ricerca: ${nome}`, nazionali: naz };
+
+  const fill = document.getElementById('progressFillNome');
+  const log  = document.getElementById('progressLogNome');
+  document.getElementById('progressAreaNome').style.display = 'block';
+  document.querySelectorAll('.btn-quick').forEach(b => b.disabled = true);
+  document.getElementById('btnFermaRicercaNome').disabled = false;
+  log.innerHTML = '';
+  fill.className = 'progress-bar-fill';
+  fill.style.width = '5%';
+  datiCorrente = [];
+  jobIdNomeCorrente = null;
+
+  const addLog = (msg, cls = '') => {
+    const p = document.createElement('p');
+    p.className = 'log-line' + (cls ? ' ' + cls : '');
+    p.textContent = '› ' + msg;
+    log.appendChild(p);
+    log.scrollTop = log.scrollHeight;
+  };
+  const addLogHTML = (msg, cls = '') => {
+    const p = document.createElement('p');
+    p.className = 'log-line' + (cls ? ' ' + cls : '');
+    p.innerHTML = '› ' + msg;
+    log.appendChild(p);
+    log.scrollTop = log.scrollHeight;
+  };
+
+  const url = `http://localhost:3456/scrape-nome?nome=${encodeURIComponent(nome)}&regione=${encodeURIComponent(regione)}&nazionali=${naz}`;
+  const es  = new EventSource(url);
+  let doneCampionati = 0;
+
+  const fine = () => {
+    es.close();
+    jobIdNomeCorrente = null;
+    document.querySelectorAll('.btn-quick').forEach(b => b.disabled = false);
+    document.getElementById('btnFermaRicercaNome').disabled = true;
+  };
+
+  es.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+
+    if (data.step === 'start') {
+      if (data.jobId) jobIdNomeCorrente = data.jobId;
+      fill.style.width = '5%';
+      addLog(data.msg, 'section');
+
+    } else if (data.step === 'section') {
+      addLog(data.msg, 'section');
+      if (data.msg.includes('NAZIONALI')) fill.style.width = '55%';
+
+    } else if (data.step === 'info') {
+      addLog(data.msg, 'info');
+
+    } else if (data.step === 'warn') {
+      addLog('⚠️ ' + data.msg, 'warn');
+
+    } else if (data.step === 'progress') {
+      if (data.tipo === 'campionato') {
+        if (data.stato === 'inizio') addLog(data.msg, 'campionato');
+        else if (data.stato === 'completato') {
+          doneCampionati++;
+          fill.style.width = Math.min(5 + doneCampionati * 2, 95) + '%';
+        }
+      } else if (data.tipo === 'girone') {
+        let cls = 'girone';
+        if (data.stato === 'ok')     cls = data.trovati > 0 ? 'girone-ok' : 'girone-vuoto';
+        if (data.stato === 'errore') cls = 'girone-err';
+        const suffix = data.stato === 'ok' && data.trovati > 0
+          ? ` <span class="log-badge">${data.trovati}</span>` : '';
+        addLogHTML(data.msg + suffix, cls);
+      }
+
+    } else if (data.step === 'done') {
+      fill.style.width = '100%';
+      fill.classList.add(data.interrotta ? 'error' : 'done');
+      addLog((data.interrotta ? '⏹ ' : '✅ ') + data.msg, data.interrotta ? 'warn' : 'done');
+      if (data.csvNome) addLog('💾 Salvato: ' + data.csvNome, 'info');
+      datiCorrente = data.data || [];
+      renderRisultati();
+      renderRiepilogo();
+      caricaStorico();
+      fine();
+
+    } else if (data.step === 'error') {
+      fill.classList.add('error');
+      addLog('❌ ' + data.msg, 'error');
+      fine();
+    }
+  };
+
+  es.onerror = () => {
+    addLog('❌ Impossibile connettersi al server (porta 3456). Avvia node server.js', 'error');
+    fill.classList.add('error');
+    fine();
+  };
+}
+
+async function fermaRicercaNome() {
+  if (!jobIdNomeCorrente) return;
+  document.getElementById('btnFermaRicercaNome').disabled = true;
+  try {
+    await fetch(`http://localhost:3456/scrape-nome/stop/${jobIdNomeCorrente}`, { method: 'POST' });
+  } catch(e) {
+    alert('Impossibile contattare il server per fermare la ricerca.');
+  }
 }
 
 function avviaCustom() {

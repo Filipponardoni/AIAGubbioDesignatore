@@ -21,6 +21,9 @@ app.use(express.json());
 const STORICO_DIR = path.join(__dirname, 'storico');
 if (!fs.existsSync(STORICO_DIR)) fs.mkdirSync(STORICO_DIR);
 
+// ─── Job attivi (per il pulsante "Ferma ricerca") ──────────────
+const activeJobs = new Map(); // jobId -> { stopped: boolean }
+
 // ─── Regioni ──────────────────────────────────────────────────
 const BASE = 'https://www.aia-figc.it';
 
@@ -109,11 +112,11 @@ async function getLinks(page, base) {
 }
 
 // ─── Scraping designazioni singola pagina ─────────────────────
-async function scrapeDesignazioni(page, url, categoriaBase, filtro) {
+async function scrapeDesignazioni(page, url, categoriaBase, filtro, campo = 'sezione') {
   const ok = await goto(page, url);
   if (!ok) return [];
 
-  return page.evaluate(({ catBase, filtro }) => {
+  return page.evaluate(({ catBase, filtro, campo }) => {
     const rows = Array.from(document.querySelectorAll('table tr'));
     const partite = [];
     let corrente = null;
@@ -186,9 +189,9 @@ async function scrapeDesignazioni(page, url, categoriaBase, filtro) {
     if (!filtro) return partite.filter(p => p.arbitri.length);
     return partite.map(p => ({
       ...p,
-      arbitri: p.arbitri.filter(a => a.sezione.toLowerCase().includes(filtro.toLowerCase()))
+      arbitri: p.arbitri.filter(a => (campo === 'nome' ? a.nome : a.sezione).toLowerCase().includes(filtro.toLowerCase()))
     })).filter(p => p.arbitri.length);
-  }, { catBase: categoriaBase, filtro: filtro || null });
+  }, { catBase: categoriaBase, filtro: filtro || null, campo });
 }
 
 // ─── Leggi titolo completo dalla pagina ──────────────────────
@@ -224,7 +227,8 @@ async function getTitoloPagina(page) {
 // e per ciascuno trovo quale girone (table-header-designazioni) lo precede.
 // Poi entro in ogni des.asp con già il nome girone corretto.
 
-async function visitaCampionato(page, nomeCamp, linkCamp, filtro, base, send, risultati) {
+async function visitaCampionato(page, nomeCamp, linkCamp, filtro, base, send, risultati, ctx = null, campo = 'sezione') {
+  if (ctx && ctx.stopped) return;
   send({ step: 'progress', tipo: 'campionato', msg: `📂 ${nomeCamp}`, stato: 'inizio' });
 
   const ok = await goto(page, linkCamp);
@@ -282,7 +286,7 @@ async function visitaCampionato(page, nomeCamp, linkCamp, filtro, base, send, ri
 
   // ── Caso 1: pagina diretta des.asp (nessun girone intermedio)
   if (struttura.tipo === 'des') {
-    const res = await scrapeDesignazioni(page, linkCamp, nomeCamp, filtro);
+    const res = await scrapeDesignazioni(page, linkCamp, nomeCamp, filtro, campo);
     risultati.push(...res);
     send({ step: 'progress', tipo: 'girone', msg: `  ✓ ${nomeCamp}`, stato: 'ok', trovati: res.length });
     send({ step: 'progress', tipo: 'campionato', msg: `📂 ${nomeCamp}`, stato: 'completato' });
@@ -305,6 +309,7 @@ async function visitaCampionato(page, nomeCamp, linkCamp, filtro, base, send, ri
   });
 
   for (const [nomeGirone, voci] of Object.entries(gironiMap)) {
+    if (ctx && ctx.stopped) break;
     // Label base per questo girone
     const labelGirone = nomeGirone && nomeGirone !== '(senza girone)'
       ? `${nomeCamp} — ${nomeGirone}`
@@ -315,6 +320,7 @@ async function visitaCampionato(page, nomeCamp, linkCamp, filtro, base, send, ri
 
     // Entra in ogni des.asp di questo girone
     for (const voce of desVoci) {
+      if (ctx && ctx.stopped) break;
       send({ step: 'progress', tipo: 'girone', msg: `  ⏳ ${labelGirone} › ${voce.testo}`, stato: 'inizio' });
 
       const okD = await goto(page, voce.href);
@@ -326,7 +332,7 @@ async function visitaCampionato(page, nomeCamp, linkCamp, filtro, base, send, ri
       }
 
       // Usa labelGirone come categoria — il girone è già incluso
-      const res = await scrapeDesignazioni(page, voce.href, labelGirone, filtro);
+      const res = await scrapeDesignazioni(page, voce.href, labelGirone, filtro, campo);
       risultati.push(...res);
       send({ step: 'progress', tipo: 'girone', msg: `  ✓ ${labelGirone} › ${voce.testo}`, stato: 'ok', trovati: res.length });
       await sleep(300);
@@ -337,10 +343,11 @@ async function visitaCampionato(page, nomeCamp, linkCamp, filtro, base, send, ri
 
     // Sub-pagine gir.asp (livello extra, raro ma possibile)
     for (const voce of girVoci) {
+      if (ctx && ctx.stopped) break;
       const okG = await goto(page, voce.href);
       if (!okG) continue;
       // Ricorsione: tratta questa sotto-pagina come un campionato
-      await visitaCampionato(page, labelGirone, voce.href, filtro, base, send, risultati);
+      await visitaCampionato(page, labelGirone, voce.href, filtro, base, send, risultati, ctx, campo);
       await goto(page, linkCamp);
     }
   }
@@ -349,7 +356,8 @@ async function visitaCampionato(page, nomeCamp, linkCamp, filtro, base, send, ri
 }
 
 // ─── SCRAPING REGIONE ─────────────────────────────────────────
-async function scrapeRegione(page, regioneSlug, sezioneTarget, send) {
+async function scrapeRegione(page, regioneSlug, sezioneTarget, send, opts = {}) {
+  const { ctx = null, filtro = sezioneTarget, campo = 'sezione' } = opts;
   const urlReg  = `${BASE}/designazioni/${regioneSlug}/`;
   const baseReg = `${BASE}/designazioni/${regioneSlug}/`;
   const risultati = [];
@@ -381,12 +389,17 @@ async function scrapeRegione(page, regioneSlug, sezioneTarget, send) {
   }, { base: baseReg, target: sezioneTarget });
 
   send({ step: 'info', msg: `Trovati ${linkCategorie.length} campionati regionali` });
-  if (sezioneHref) send({ step: 'info', msg: `Sezione "${sezioneTarget}" trovata ✓` });
-  else send({ step: 'warn', msg: `Sezione "${sezioneTarget}" non trovata nella tabella sezioni — filtro solo per nome arbitro` });
+  if (campo === 'sezione') {
+    if (sezioneHref) send({ step: 'info', msg: `Sezione "${sezioneTarget}" trovata ✓` });
+    else send({ step: 'warn', msg: `Sezione "${sezioneTarget}" non trovata nella tabella sezioni — filtro solo per nome arbitro` });
+  } else {
+    send({ step: 'info', msg: `Ricerca per nome arbitro: "${filtro}"` });
+  }
 
   // ── Parte 1: categorie regionali
   for (const cat of linkCategorie) {
-    await visitaCampionato(page, cat.testo, cat.href, sezioneTarget, baseReg, send, risultati);
+    if (ctx && ctx.stopped) { send({ step: 'warn', msg: '⏹ Ricerca interrotta dall\'utente.' }); break; }
+    await visitaCampionato(page, cat.testo, cat.href, filtro, baseReg, send, risultati, ctx, campo);
     await sleep(400);
   }
 
@@ -397,12 +410,14 @@ async function scrapeRegione(page, regioneSlug, sezioneTarget, send) {
 }
 
 // ─── SCRAPING NAZIONALI ───────────────────────────────────────
-async function scrapeNazionali(page, filtro, send) {
+async function scrapeNazionali(page, filtro, send, opts = {}) {
+  const { ctx = null, campo = 'sezione' } = opts;
   const risultati = [];
 
   send({ step: 'section', msg: `━━ CAMPIONATI NAZIONALI ━━` });
 
   for (const can of NAZIONALI) {
+    if (ctx && ctx.stopped) { send({ step: 'warn', msg: '⏹ Ricerca interrotta dall\'utente.' }); break; }
     send({ step: 'section', msg: `▶ ${can.nome}` });
     const ok = await goto(page, can.url);
     if (!ok) { send({ step: 'warn', msg: `Impossibile aprire ${can.nome}` }); continue; }
@@ -425,8 +440,9 @@ async function scrapeNazionali(page, filtro, send) {
     send({ step: 'info', msg: `${can.nome}: ${campionati.length} campionati trovati` });
 
     for (const camp of campionati) {
+      if (ctx && ctx.stopped) break;
       const nomeCamp = `${can.nome} › ${camp.testo}`;
-      await visitaCampionato(page, nomeCamp, camp.href, filtro, can.url, send, risultati);
+      await visitaCampionato(page, nomeCamp, camp.href, filtro, can.url, send, risultati, ctx, campo);
       await sleep(400);
     }
   }
@@ -649,9 +665,71 @@ app.get('/storico/cerca/:nome', (req, res) => {
   } catch(e) { res.json([]); }
 });
 
-// ─── Endpoint: scraping SSE ───────────────────────────────────
-app.get('/scrape', async (req, res) => {
+// ─── Endpoint: ferma una ricerca per nome in corso ─────────────
+app.post('/scrape-nome/stop/:jobId', (req, res) => {
+  const job = activeJobs.get(req.params.jobId);
+  if (job) { job.stopped = true; return res.json({ ok: true }); }
+  res.status(404).json({ error: 'Ricerca non trovata o già conclusa' });
+});
+
+// ─── Endpoint: ricerca per nome arbitro (SSE, interrompibile) ─
+// modalita: solo CRA specifico (default) oppure CRA + nazionali
+app.get('/scrape-nome', async (req, res) => {
   res.setHeader('Content-Type',  'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection',    'keep-alive');
+  res.flushHeaders();
+
+  const nome      = (req.query.nome    || '').trim();
+  const regione   = req.query.regione  || 'umbria';
+  const nazionali = req.query.nazionali === 'true';
+
+  const send = data => res.write(`data: ${JSON.stringify(data)}\n\n`);
+
+  if (!nome) {
+    send({ step: 'error', msg: 'Inserisci il nome dell\'arbitro da cercare.' });
+    return res.end();
+  }
+
+  const jobId = 'job' + Date.now() + Math.random().toString(36).slice(2, 8);
+  const ctx   = { stopped: false };
+  activeJobs.set(jobId, ctx);
+
+  send({ step: 'start', msg: `Ricerca "${nome}" — CRA ${regione.toUpperCase()}${nazionali ? ' + Nazionali' : ''}`, jobId });
+
+  const browser = await createBrowser();
+  const page    = await newPage(browser);
+
+  try {
+    const resReg = await scrapeRegione(page, regione, nome, send, { ctx, filtro: nome, campo: 'nome' });
+    let resNaz = [];
+    if (nazionali && !ctx.stopped) {
+      resNaz = await scrapeNazionali(page, nome, send, { ctx, campo: 'nome' });
+    }
+
+    const tutti = [...resReg, ...resNaz];
+    const csv   = salvaCSV(tutti, regione, `ricerca_${nome.replace(/\s+/g,'')}`);
+    send({ step: 'info', msg: `Salvato: ${csv}` });
+    send({
+      step: 'done',
+      msg: ctx.stopped
+        ? `Ricerca interrotta manualmente. ${tutti.length} partite trovate fino a questo momento.`
+        : `Completato! ${tutti.length} partite trovate.`,
+      data: tutti,
+      csvNome: csv,
+      interrotta: ctx.stopped
+    });
+  } catch(e) {
+    send({ step: 'error', msg: e.message });
+  } finally {
+    activeJobs.delete(jobId);
+    await browser.close();
+    res.end();
+  }
+});
+
+// ─── Endpoint: scraping SSE ───────────────────────────────────
+app.get('/scrape', async (req, res) => {  res.setHeader('Content-Type',  'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection',    'keep-alive');
   res.flushHeaders();
