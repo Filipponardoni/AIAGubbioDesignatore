@@ -135,6 +135,13 @@
     .r-AE{background:#d4e6f1;color:#154360}.r-AA{background:#d5f5e3;color:#145a32}
     .r-QU{background:#fdebd0;color:#784212}.r-4U{background:#e8daef;color:#4a235a}
     .r-DEF{background:#eaecee;color:#4d5656}
+    /* Ruoli C11 / Qu: Arbitro (blu) e Assistenti (verde) */
+    .r-ARB{background:#d4e6f1;color:#154360}
+    .r-ASS{background:#d5f5e3;color:#145a32}
+    /* Ruoli Calcio a 5 */
+    .r-C5-A1{background:#fdebd0;color:#784212}
+    .r-C5-A2{background:#e8daef;color:#4a235a}
+    .r-C5-CRONO{background:#d6eaf8;color:#1b4f72}
 
     /* STORICO */
     .storico-empty{text-align:center;padding:32px;color:#999;font-size:13px}
@@ -181,58 +188,53 @@
   <div class="card">
     <div class="card-title">🔍 Ricerca Designazioni</div>
 
-    <!-- Bottoni rapidi -->
-    <div class="quick-btns">
-      <button class="btn-quick" onclick="avviaRapido()">
-        ⚡ Cerca Gubbio — Umbria + Nazionali
-      </button>
-      <button class="btn-quick btn-verde" onclick="avviaNazionaliRegione()">
-        🌍 Tutti gli arbitri Umbri nei Nazionali
-      </button>
-      <button class="btn-quick btn-oro" onclick="mostraConfigurazione()">
-        ⚙️ Altra Sezione / Regione
-      </button>
+    <!-- Configurazione principale (sempre visibile) -->
+    <div class="form-row">
+      <div class="form-group">
+        <label>Regione</label>
+        <select id="selRegione"></select>
+      </div>
+      <div class="form-group">
+        <label>Nome Sezione</label>
+        <input type="text" id="inputSezione" placeholder="es. Perugia, Terni, Foligno..."/>
+      </div>
     </div>
+    <div class="form-row" style="align-items:center">
+      <label class="toggle-wrap" onclick="toggleNazionali()">
+        <div class="toggle on" id="toggleNaz"></div>
+        Cerca anche nei campionati nazionali (CAN D, Serie D, Calcio a 5...)
+      </label>
+    </div>
+    <button class="btn-quick" style="margin-top:8px" onclick="avviaCustom()">
+      🔎 Avvia Ricerca Personalizzata
+    </button>
 
-    <!-- Configurazione avanzata (nascosta di default) -->
-    <div id="configPanel" style="display:none;border-top:1px solid var(--bordo);padding-top:16px;margin-top:4px">
+    <div style="border-top:1px dashed var(--bordo);margin-top:18px;padding-top:16px">
+      <p style="font-size:12px;color:#666;margin-bottom:12px">
+        <strong>Ricerca nazionali per regione</strong> — cerca tutti gli arbitri di una regione
+        (legge le sezioni dal sito in automatico) nei campionati nazionali.
+      </p>
       <div class="form-row">
         <div class="form-group">
-          <label>Regione</label>
-          <select id="selRegione"></select>
+          <label>Regione da cercare nei nazionali</label>
+          <select id="selRegioneNaz"></select>
         </div>
-        <div class="form-group">
-          <label>Nome Sezione</label>
-          <input type="text" id="inputSezione" placeholder="es. Perugia, Terni, Foligno..."/>
+        <div style="display:flex;align-items:flex-end">
+          <button class="btn-quick btn-verde" style="min-width:auto;padding:10px 18px" onclick="avviaNazionaliRegioneCustom()">
+            🌍 Cerca nei Nazionali
+          </button>
         </div>
       </div>
-      <div class="form-row" style="align-items:center">
-        <label class="toggle-wrap" onclick="toggleNazionali()">
-          <div class="toggle on" id="toggleNaz"></div>
-          Cerca anche nei campionati nazionali (CAN D, Serie D, Calcio a 5...)
-        </label>
-      </div>
-      <button class="btn-quick" style="margin-top:8px" onclick="avviaCustom()">
-        🔎 Avvia Ricerca Personalizzata
-      </button>
+    </div>
 
-      <div style="border-top:1px dashed var(--bordo);margin-top:18px;padding-top:16px">
-        <p style="font-size:12px;color:#666;margin-bottom:12px">
-          <strong>Ricerca nazionali per regione</strong> — cerca tutti gli arbitri di una regione
-          (legge le sezioni dal sito in automatico) nei campionati nazionali.
-        </p>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Regione da cercare nei nazionali</label>
-            <select id="selRegioneNaz"></select>
-          </div>
-          <div style="display:flex;align-items:flex-end">
-            <button class="btn-quick btn-verde" style="min-width:auto;padding:10px 18px" onclick="avviaNazionaliRegioneCustom()">
-              🌍 Cerca nei Nazionali
-            </button>
-          </div>
-        </div>
-      </div>
+    <!-- Bottoni rapidi Gubbio -->
+    <div class="quick-btns" style="border-top:1px solid var(--bordo);margin-top:18px;padding-top:18px">
+      <button class="btn-quick" onclick="avviaRapido()">
+        ⚡ Cerca Gubbio — Regionali + Nazionali
+      </button>
+      <button class="btn-quick btn-verde" onclick="avviaRapidoSoloRegionali()">
+        🏟️ Cerca Gubbio — Solo Regionali
+      </button>
     </div>
 
     <!-- Progress -->
@@ -244,13 +246,19 @@
     </div>
   </div>
 
-  <!-- TABS RISULTATI / STORICO / RIEPILOGO -->
+  <!-- STORICO — sempre visibile e consultabile -->
+  <div class="card">
+    <div class="card-title">🗂️ Storico Estrazioni</div>
+    <p style="font-size:12px;color:#888;margin-bottom:14px">Tutte le estrazioni salvate automaticamente nella cartella <code>storico/</code>.</p>
+    <div id="storicoBody"><div class="storico-empty">Caricamento...</div></div>
+  </div>
+
+  <!-- TABS RISULTATI / RIEPILOGO -->
   <div id="pannelloRisultati" style="display:none">
     <div class="card" style="padding:0;overflow:hidden">
       <div class="tabs">
         <button class="tab-btn active" onclick="mostraTab('risultati',this)">📋 Risultati</button>
         <button class="tab-btn" onclick="mostraTab('riepilogo',this)">👤 Riepilogo arbitri</button>
-        <button class="tab-btn" onclick="mostraTab('storico',this);caricaStorico()">🗂️ Storico</button>
       </div>
 
       <!-- TAB RISULTATI -->
@@ -275,11 +283,6 @@
         <div id="riepilogoBody"></div>
       </div>
 
-      <!-- TAB STORICO -->
-      <div id="tab-storico" style="display:none;padding:22px 26px">
-        <p style="font-size:12px;color:#888;margin-bottom:14px">Tutte le estrazioni salvate automaticamente nella cartella <code>storico/</code>.</p>
-        <div id="storicoBody"><div class="storico-empty">Caricamento...</div></div>
-      </div>
     </div>
   </div>
 
@@ -296,6 +299,7 @@ let prevData      = null; // dati precedenti per confronto
 window.addEventListener('DOMContentLoaded', async () => {
   await caricaRegioni();
   ripristinaPref();
+  caricaStorico();
 });
 
 async function caricaRegioni() {
@@ -335,18 +339,13 @@ function salvaPref(reg, sez, naz) {
 }
 
 // ── UI helpers ────────────────────────────────────────────────
-function mostraConfigurazione() {
-  const p = document.getElementById('configPanel');
-  p.style.display = p.style.display === 'none' ? 'block' : 'none';
-}
-
 function toggleNazionali() {
   nazionaliOn = !nazionaliOn;
   document.getElementById('toggleNaz').classList.toggle('on', nazionaliOn);
 }
 
 function mostraTab(nome, btn) {
-  ['risultati','riepilogo','storico'].forEach(t => {
+  ['risultati','riepilogo'].forEach(t => {
     document.getElementById('tab-' + t).style.display = t === nome ? 'block' : 'none';
   });
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -356,6 +355,10 @@ function mostraTab(nome, btn) {
 // ── Avvio ricerca ─────────────────────────────────────────────
 function avviaRapido() { // nazionali sempre inclusi
   avvia("umbria", "Gubbio", true);
+}
+
+function avviaRapidoSoloRegionali() { // solo regionali, niente nazionali
+  avvia("umbria", "Gubbio", false);
 }
 
 function avviaCustom() {
@@ -451,6 +454,7 @@ function avvia(regione, sezione, nazionali) {
       datiCorrente = data.data || [];
       renderRisultati();
       renderRiepilogo();
+      caricaStorico();
       document.querySelectorAll('.btn-quick').forEach(b => b.disabled = false);
 
     } else if (data.step === 'error') {
@@ -499,9 +503,10 @@ function renderRisultati(data) {
       <table class="des-table"><thead><tr><th>Arbitro</th><th>Ruolo</th><th>Partita</th></tr></thead><tbody>`;
     partite.forEach(p => {
       p.arbitri.forEach(a => {
+        const m = mappaRuolo(cat, a.ruolo);
         html += `<tr>
           <td><strong>${a.nome}</strong>${a._new?'<span class="new-badge">NUOVA</span>':''}${a._removed?'<span class="removed-badge">RIMOSSA</span>':''}</td>
-          <td><span class="ruolo-badge ${getRuoloCss(a.ruolo)}">${a.ruolo}</span></td>
+          <td><span class="ruolo-badge ${m.css}">${m.label}</span></td>
           <td>${p.partita}</td></tr>`;
       });
     });
@@ -510,13 +515,28 @@ function renderRisultati(data) {
   body.innerHTML = html;
 }
 
-function getRuoloCss(r) {
-  r = (r||'').toUpperCase();
-  if (r.includes('AE')||r==='ARBITRO') return 'r-AE';
-  if (r.includes('AA')||r.includes('ARBIT')) return 'r-AA';
-  if (r.includes('QU')) return 'r-QU';
-  if (r.includes('4U')||r.includes('QUART')) return 'r-4U';
-  return 'r-DEF';
+// ── Mappatura ruoli per categoria ──────────────────────────────
+function isCalcioA5(categoria) {
+  return /calcio\s*a\s*(5|cinque)|futsal/i.test(categoria || '');
+}
+
+// Ritorna { label, css } per il ruolo dato, in base alla categoria.
+function mappaRuolo(categoria, ruoloRaw) {
+  const rLow = (ruoloRaw || '').toLowerCase();
+
+  // ── Calcio a 5: Arbitro 1 / Arbitro 2 / Cronometrista ──
+  if (isCalcioA5(categoria)) {
+    if (rLow.includes('crono')) return { label: 'Cronometrista', css: 'r-C5-CRONO' };
+    if (rLow.includes('2'))     return { label: 'Arbitro 2', css: 'r-C5-A2' };
+    return { label: 'Arbitro 1', css: 'r-C5-A1' };
+  }
+
+  // ── C11: Arbitro / Assistente 1 / Assistente 2 / Quarto Uomo ──
+  // Quarto Uomo colorato come l'Arbitro (stesso colore)
+  if (rLow.includes('4') || rLow.includes('quart')) return { label: 'Quarto Uomo', css: 'r-ARB' };
+  if (rLow.includes('3'))                            return { label: 'Assistente 2', css: 'r-ASS' };
+  if (rLow.includes('2'))                            return { label: 'Assistente 1', css: 'r-ASS' };
+  return { label: 'Arbitro', css: 'r-ARB' };
 }
 
 // ── Riepilogo per arbitro ─────────────────────────────────────
@@ -599,6 +619,7 @@ function avviaNazRegione(regione) {
       es.close();
       datiCorrente = data.data || [];
       renderRisultati(); renderRiepilogo();
+      caricaStorico();
       document.querySelectorAll('.btn-quick').forEach(b => b.disabled = false);
     } else if (data.step === 'error') {
       fill.classList.add('error');
@@ -709,7 +730,7 @@ function esportaPDF() {
     y += 11;
 
     const rows = [];
-    partite.forEach(p => p.arbitri.forEach(a => rows.push([a.nome, a.ruolo, p.partita])));
+    partite.forEach(p => p.arbitri.forEach(a => rows.push([a.nome, mappaRuolo(cat, a.ruolo).label, p.partita])));
     doc.autoTable({
       startY: y, head:[['Arbitro','Ruolo','Partita']], body: rows,
       margin:{left:10,right:10},
@@ -739,7 +760,7 @@ function esportaExcel() {
   // Foglio designazioni
   const righe = [['Categoria','Partita','Arbitro','Ruolo','Sezione']];
   datiCorrente.forEach(p => p.arbitri.forEach(a =>
-    righe.push([p.categoria, p.partita, a.nome, a.ruolo, a.sezione])
+    righe.push([p.categoria, p.partita, a.nome, mappaRuolo(p.categoria, a.ruolo).label, a.sezione])
   ));
   const ws = XLSX.utils.aoa_to_sheet(righe);
   ws['!cols'] = [{wch:28},{wch:35},{wch:22},{wch:12},{wch:18}];
